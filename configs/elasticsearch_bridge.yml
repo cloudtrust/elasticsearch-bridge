@@ -1,0 +1,44 @@
+# Component configs
+component-http-host-port: 0.0.0.0:8888
+
+# Flaki ID generator
+flaki-host-port: flaki:5555
+
+# Elasticsearch configs
+
+
+# Redis configs
+redis-host-port: 
+redis-password: 
+redis-database: 0
+redis-write-interval-ms: 1000
+
+# Cockroach configs
+cockroach-host-port: 172.19.0.2:23:26257
+cockroach-username: health
+cockroach-password: health
+cockroach-database: health
+
+# Influx DB configs
+influx-host-port: 
+influx-username: 
+influx-password: 
+influx-database: 
+influx-precision: s
+influx-retention-policy: ""
+influx-write-consistency: ""
+influx-write-interval-ms: 1000
+
+# Sentry configs
+sentry-dsn: 
+
+# Jaeger configs
+jaeger-sampler-type: const
+jaeger-sampler-param: 1
+jaeger-sampler-host-port: 
+jaeger-reporter-logspan: false
+jaeger-write-interval-ms: 1000
+jaeger-collector-healthcheck-host-port: 
+
+# Debug routes
+pprof-route-enabled: true
