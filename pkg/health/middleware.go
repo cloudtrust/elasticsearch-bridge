@@ -1,6 +1,5 @@
 package health
 
-//go:generate mockgen -destination=./mock/idGenerator.go -package=mock -mock_names=IDGeneratorModule=FlakiModule github.com/cloudtrust/flaki-service/pkg/flaki IDGeneratorModule
 
 import (
 	"context"
@@ -25,6 +24,6 @@ func MakeEndpointCorrelationIDMW(g IDGenerator) endpoint.Middleware {
 				ctx = context.WithValue(ctx, "correlation_id", g.NextValidID(ctx))
 			}
 			return next(ctx, req)
-		} 
+		}
 	}
 }

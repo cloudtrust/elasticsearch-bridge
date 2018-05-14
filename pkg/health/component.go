@@ -2,6 +2,9 @@ package health
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"time"
 
 	common "github.com/cloudtrust/common-healthcheck"
 )
@@ -18,23 +21,34 @@ const (
 	Degraded
 	// Deactivated is the status for a service that is deactivated, e.g. we can disable error tracking, instrumenting, tracing,...
 	Deactivated
+	// Unknown is the status set when there is unexpected errors, e.g. parsing status from DB.
+	Unknown
 )
 
-func (s Status) String() string {
-	var names = []string{"OK", "KO", "Degraded", "Deactivated"}
+const (
+	// Names of the units in the health check http response and in the DB.
+	influxUnitName = "influx"
+	jaegerUnitName = "jaeger"
+	redisUnitName  = "redis"
+	sentryUnitName = "sentry"
+)
 
-	if s < OK || s > Deactivated {
-		return "Unknown"
+var statusName = []string{"OK", "KO", "Degraded", "Deactivated", "Unknown"}
+
+func status(s string) Status {
+	for i, n := range statusName {
+		if n == s {
+			return Status(i)
+		}
 	}
-
-	return names[s]
+	return Unknown
 }
 
-// StorageModule is the interface of the module that stores the health reports
-// in the DB.
-type StorageModule interface {
-	Update()
-	Read()
+func (s Status) String() string {
+	if s >= 0 && int(s) <= len(statusName) {
+		return statusName[s]
+	}
+	return Unknown.String()
 }
 
 // InfluxHealthChecker is the interface of the influx health check module.
@@ -42,9 +56,9 @@ type InfluxHealthChecker interface {
 	HealthChecks(context.Context) []common.InfluxReport
 }
 
-// SentryHealthChecker is the interface of the sentry health check module.
-type SentryHealthChecker interface {
-	HealthChecks(context.Context) []common.SentryReport
+// JaegerHealthChecker is the interface of the jaeger health check module.
+type JaegerHealthChecker interface {
+	HealthChecks(context.Context) []common.JaegerReport
 }
 
 // RedisHealthChecker is the interface of the redis health check module.
@@ -52,173 +66,133 @@ type RedisHealthChecker interface {
 	HealthChecks(context.Context) []common.RedisReport
 }
 
-// JaegerHealthChecker is the interface of the jaeger health check module.
-type JaegerHealthChecker interface {
-	HealthChecks(context.Context) []common.JaegerReport
+// SentryHealthChecker is the interface of the sentry health check module.
+type SentryHealthChecker interface {
+	HealthChecks(context.Context) []common.SentryReport
+}
+
+// StorageModule is the interface of the module that stores the health reports
+// in the DB.
+type StorageModule interface {
+	Read(name string) (StoredReport, error)
+	Update(unit string, validity time.Duration, reports json.RawMessage) error
 }
 
 // Component is the Health component.
 type Component struct {
-	influx  InfluxHealthChecker
-	jaeger  JaegerHealthChecker
-	redis   RedisHealthChecker
-	sentry  SentryHealthChecker
-	storage StorageModule
+	influx              InfluxHealthChecker
+	jaeger              JaegerHealthChecker
+	redis               RedisHealthChecker
+	sentry              SentryHealthChecker
+	storage             StorageModule
+	healthCheckValidity map[string]time.Duration
 }
 
 // NewComponent returns the health component.
-func NewComponent(influx InfluxHealthChecker, jaeger JaegerHealthChecker, redis RedisHealthChecker, sentry SentryHealthChecker, storage StorageModule) *Component {
+func NewComponent(influx InfluxHealthChecker, jaeger JaegerHealthChecker, redis RedisHealthChecker, sentry SentryHealthChecker, storage StorageModule, healthCheckValidity map[string]time.Duration) *Component {
 	return &Component{
-		influx:  influx,
-		jaeger:  jaeger,
-		redis:   redis,
-		sentry:  sentry,
-		storage: storage,
+		influx:              influx,
+		jaeger:              jaeger,
+		redis:               redis,
+		sentry:              sentry,
+		storage:             storage,
+		healthCheckValidity: healthCheckValidity,
 	}
 }
 
-type Report interface{}
-
 // ExecInfluxHealthChecks executes the health checks for Influx.
-func (c *Component) ExecInfluxHealthChecks(ctx context.Context) []common.InfluxReport {
-	return c.influx.HealthChecks(ctx)
+func (c *Component) ExecInfluxHealthChecks(ctx context.Context) json.RawMessage {
+	var reports = c.influx.HealthChecks(ctx)
+	var jsonReports, _ = json.Marshal(reports)
+
+	c.storage.Update(influxUnitName, c.healthCheckValidity[influxUnitName], jsonReports)
+	return json.RawMessage(jsonReports)
 }
 
 // ReadInfluxHealthChecks read the health checks status in DB.
-func (c *Component) ReadInfluxHealthChecks(ctx context.Context) []common.InfluxReport {
-	return nil
+func (c *Component) ReadInfluxHealthChecks(ctx context.Context) json.RawMessage {
+	return c.readFromDB(influxUnitName)
 }
 
 // ExecJaegerHealthChecks executes the health checks for Jaeger.
-func (c *Component) ExecJaegerHealthChecks(ctx context.Context) []common.JaegerReport {
-	return c.jaeger.HealthChecks(ctx)
+func (c *Component) ExecJaegerHealthChecks(ctx context.Context) json.RawMessage {
+	var reports = c.jaeger.HealthChecks(ctx)
+	var jsonReports, _ = json.Marshal(reports)
+
+	c.storage.Update(jaegerUnitName, c.healthCheckValidity[jaegerUnitName], jsonReports)
+	return json.RawMessage(jsonReports)
 }
 
 // ReadJaegerHealthChecks read the health checks status in DB.
-func (c *Component) ReadJaegerHealthChecks(ctx context.Context) []common.JaegerReport {
-	return nil
+func (c *Component) ReadJaegerHealthChecks(ctx context.Context) json.RawMessage {
+	return c.readFromDB(jaegerUnitName)
 }
 
 // ExecRedisHealthChecks executes the health checks for Redis.
-func (c *Component) ExecRedisHealthChecks(ctx context.Context) []common.RedisReport {
-	return c.redis.HealthChecks(ctx)
+func (c *Component) ExecRedisHealthChecks(ctx context.Context) json.RawMessage {
+	var reports = c.redis.HealthChecks(ctx)
+	var jsonReports, _ = json.Marshal(reports)
+
+	c.storage.Update(redisUnitName, c.healthCheckValidity[redisUnitName], jsonReports)
+	return json.RawMessage(jsonReports)
+
 }
 
 // ReadRedisHealthChecks read the health checks status in DB.
-func (c *Component) ReadRedisHealthChecks(ctx context.Context) []common.RedisReport {
-	return nil
+func (c *Component) ReadRedisHealthChecks(ctx context.Context) json.RawMessage {
+	return c.readFromDB(redisUnitName)
 }
 
 // ExecSentryHealthChecks executes the health checks for Sentry.
-func (c *Component) ExecSentryHealthChecks(ctx context.Context) []common.SentryReport {
-	return c.sentry.HealthChecks(ctx)
+func (c *Component) ExecSentryHealthChecks(ctx context.Context) json.RawMessage {
+	var reports = c.sentry.HealthChecks(ctx)
+	var jsonReports, _ = json.Marshal(reports)
+
+	c.storage.Update(sentryUnitName, c.healthCheckValidity[sentryUnitName], jsonReports)
+	return json.RawMessage(jsonReports)
 }
 
 // ReadSentryHealthChecks read the health checks status in DB.
-func (c *Component) ReadSentryHealthChecks(ctx context.Context) []common.SentryReport {
-	return nil
+func (c *Component) ReadSentryHealthChecks(ctx context.Context) json.RawMessage {
+	return c.readFromDB(sentryUnitName)
 }
 
 // AllHealthChecks call all component checks and build a general health report.
-func (c *Component) AllHealthChecks(ctx context.Context) map[string]string {
-	var reports = map[string]string{}
+func (c *Component) AllHealthChecks(ctx context.Context) json.RawMessage {
+	var reports = map[string]json.RawMessage{}
 
-	reports["influx"] = determineInfluxStatus(c.ExecInfluxHealthChecks(ctx))
-	reports["jaeger"] = determineJaegerStatus(c.ExecJaegerHealthChecks(ctx))
-	reports["redis"] = determineRedisStatus(c.ExecRedisHealthChecks(ctx))
-	reports["sentry"] = determineSentryStatus(c.ExecSentryHealthChecks(ctx))
+	reports[influxUnitName] = c.ReadInfluxHealthChecks(ctx)
+	reports[jaegerUnitName] = c.ReadJaegerHealthChecks(ctx)
+	reports[redisUnitName] = c.ReadRedisHealthChecks(ctx)
+	reports[sentryUnitName] = c.ReadSentryHealthChecks(ctx)
 
-	return reports
+	var jsonReports, _ = json.Marshal(reports)
+	return json.RawMessage(jsonReports)
 }
 
-// err return the string error that will be in the health report
-func err(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
-}
+func (c *Component) readFromDB(unit string) json.RawMessage {
+	var storedReport, err = c.storage.Read(unit)
 
-// determineStatus parse all the tests reports and output a global status.
-func determineInfluxStatus(reports []common.InfluxReport) string {
-	var degraded = false
-	for _, r := range reports {
-		switch r.Status {
-		case common.Deactivated:
-			// If the status is Deactivated, we do not need to go through all tests reports, all
-			// status will be the same.
-			return Deactivated.String()
-		case common.KO:
-			return KO.String()
-		case common.Degraded:
-			degraded = true
-		}
+	if err != nil {
+		var error = fmt.Sprintf("could not read reports from DB: %v", err)
+		var jsonReport = fmt.Sprintf(`{"Name":"%s", "Status":"Unknown", "Error": "%s"}`, unit, error)
+		return json.RawMessage(jsonReport)
 	}
-	if degraded {
-		return Degraded.String()
-	}
-	return OK.String()
-}
 
-// determineStatus parse all the tests reports and output a global status.
-func determineRedisStatus(reports []common.RedisReport) string {
-	var degraded = false
-	for _, r := range reports {
-		switch r.Status {
-		case common.Deactivated:
-			// If the status is Deactivated, we do not need to go through all tests reports, all
-			// status will be the same.
-			return Deactivated.String()
-		case common.KO:
-			return KO.String()
-		case common.Degraded:
-			degraded = true
-		}
+	if storedReport.ComponentID == "" {
+		var error = fmt.Sprintf("no reports stored in DB")
+		var jsonReport = fmt.Sprintf(`{"Name":"%s", "Status":"Unknown", "Error": "%s"}`, unit, error)
+		return json.RawMessage(jsonReport)
 	}
-	if degraded {
-		return Degraded.String()
-	}
-	return OK.String()
-}
 
-// determineStatus parse all the tests reports and output a global status.
-func determineJaegerStatus(reports []common.JaegerReport) string {
-	var degraded = false
-	for _, r := range reports {
-		switch r.Status {
-		case common.Deactivated:
-			// If the status is Deactivated, we do not need to go through all tests reports, all
-			// status will be the same.
-			return Deactivated.String()
-		case common.KO:
-			return KO.String()
-		case common.Degraded: 
-			degraded = true
-		}
+	// If the health check was executed too long ago, the health check report
+	// is considered not pertinant and an error is returned.
+	if time.Now().After(storedReport.ValidUntil) {
+		var error = fmt.Sprintf("the health check results are stale because the test was not executed in the last %s", c.healthCheckValidity[storedReport.HealthcheckUnit])
+		var jsonReport = fmt.Sprintf(`{"Name":"%s", "Error": "%s"}`, unit, error)
+		return json.RawMessage(jsonReport)
 	}
-	if degraded {
-		return Degraded.String()
-	}
-	return OK.String()
-}
 
-// determineStatus parse all the tests reports and output a global status.
-func determineSentryStatus(reports []common.SentryReport) string {
-	var degraded = false
-	for _, r := range reports {
-		switch r.Status {
-		case common.Deactivated:
-			// If the status is Deactivated, we do not need to go through all tests reports, all
-			// status will be the same.
-			return Deactivated.String()
-		case common.KO:
-			return KO.String()
-		case common.Degraded:
-			degraded = true
-		}
-	}
-	if degraded {
-		return Degraded.String()
-	}
-	return OK.String()
+	return storedReport.Reports
+
 }

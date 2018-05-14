@@ -1,8 +1,7 @@
 package health
 
-//go:generate mockgen -destination=./mock/component.go -package=mock -mock_names=HealthChecker=HealthChecker github.com/cloudtrust/flaki-service/pkg/health HealthChecker
-
 import (
+	"encoding/json"
 	"context"
 
 	"github.com/go-kit/kit/endpoint"
@@ -23,15 +22,15 @@ type Endpoints struct {
 
 // HealthChecker is the health component interface.
 type HealthChecker interface {
-	ExecInfluxHealthChecks(context.Context) []Report 
-	ReadInfluxHealthChecks(context.Context) []Report
-	ExecJaegerHealthChecks(context.Context) []Report
-	ReadJaegerHealthChecks(context.Context) []Report
-	ExecRedisHealthChecks(context.Context) []Report
-	ReadRedisHealthChecks(context.Context) []Report
-	ExecSentryHealthChecks(context.Context) []Report
-	ReadSentryHealthChecks(context.Context) []Report
-	AllHealthChecks(context.Context) map[string]string
+	ExecInfluxHealthChecks(context.Context) json.RawMessage
+	ReadInfluxHealthChecks(context.Context) json.RawMessage
+	ExecJaegerHealthChecks(context.Context) json.RawMessage
+	ReadJaegerHealthChecks(context.Context) json.RawMessage
+	ExecRedisHealthChecks(context.Context) json.RawMessage
+	ReadRedisHealthChecks(context.Context) json.RawMessage
+	ExecSentryHealthChecks(context.Context) json.RawMessage
+	ReadSentryHealthChecks(context.Context) json.RawMessage
+	AllHealthChecks(context.Context) json.RawMessage
 }
 
 // MakeExecInfluxHealthCheckEndpoint makes the InfluxHealthCheck endpoint

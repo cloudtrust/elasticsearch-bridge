@@ -1,9 +1,11 @@
 package health_test
 
+//go:generate mockgen -destination=./mock/component.go -package=mock -mock_names=HealthChecker=HealthChecker github.com/cloudtrust/flaki-service/pkg/health HealthChecker
+
 import (
 	"context"
+	"encoding/json"
 	"testing"
-	"time"
 
 	. "github.com/cloudtrust/flaki-service/pkg/health"
 	"github.com/cloudtrust/flaki-service/pkg/health/mock"
@@ -16,30 +18,27 @@ func TestInfluxHealthCheckEndpoint(t *testing.T) {
 	defer mockCtrl.Finish()
 	var mockComponent = mock.NewHealthChecker(mockCtrl)
 
-	var e = MakeInfluxHealthCheckEndpoint(mockComponent)
+	var e = MakeExecInfluxHealthCheckEndpoint(mockComponent)
+	var r = MakeReadInfluxHealthCheckEndpoint(mockComponent)
 
-	// Health success.
-	{ 
-		mockComponent.EXPECT().InfluxHealthChecks(context.Background()).Return([]Report{{Name: "influx", Duration: (1 * time.Second).String(), Status: OK.String()}}).Times(1)
+	//Exec
+	{
+		var j = json.RawMessage(`{"Name":"Test","Status":"OK"}`)
+		mockComponent.EXPECT().ExecInfluxHealthChecks(context.Background()).Return(j).Times(1)
 		var reports, err = e(context.Background(), nil)
 		assert.Nil(t, err)
-		var report = reports.([]Report)[0]
-		assert.Equal(t, "influx", report.Name)
-		assert.Equal(t, (1 * time.Second).String(), report.Duration)
-		assert.Equal(t, "OK", report.Status)
-		assert.Zero(t, report.Error)
+		var json, _ = json.Marshal(&reports)
+		assert.Equal(t, `{"Name":"Test","Status":"OK"}`, string(json))
 	}
 
-	// Health error.
+	//Read
 	{
-		mockComponent.EXPECT().InfluxHealthChecks(context.Background()).Return([]Report{{Name: "influx", Duration: (1 * time.Second).String(), Status: KO.String(), Error: "fail"}}).Times(1)
-		var reports, err = e(context.Background(), nil)
+		var j = json.RawMessage(`{"Name":"Test","Status":"OK"}`)
+		mockComponent.EXPECT().ReadInfluxHealthChecks(context.Background()).Return(j).Times(1)
+		var reports, err = r(context.Background(), nil)
 		assert.Nil(t, err)
-		var report = reports.([]Report)[0]
-		assert.Equal(t, "influx", report.Name)
-		assert.Equal(t, (1 * time.Second).String(), report.Duration)
-		assert.Equal(t, "KO", report.Status)
-		assert.Equal(t, "fail", report.Error)
+		var json, _ = json.Marshal(&reports)
+		assert.Equal(t, `{"Name":"Test","Status":"OK"}`, string(json))
 	}
 }
 
@@ -48,31 +47,29 @@ func TestJaegerHealthCheckEndpoint(t *testing.T) {
 	defer mockCtrl.Finish()
 	var mockComponent = mock.NewHealthChecker(mockCtrl)
 
-	var e = MakeJaegerHealthCheckEndpoint(mockComponent)
+	var e = MakeExecJaegerHealthCheckEndpoint(mockComponent)
+	var r = MakeReadJaegerHealthCheckEndpoint(mockComponent)
 
-	// Health success.
+	//Exec
 	{
-		mockComponent.EXPECT().JaegerHealthChecks(context.Background()).Return([]Report{{Name: "jaeger", Duration: (1 * time.Second).String(), Status: OK.String()}}).Times(1)
+		var j = json.RawMessage(`{"Name":"Test","Status":"OK"}`)
+		mockComponent.EXPECT().ExecJaegerHealthChecks(context.Background()).Return(j).Times(1)
 		var reports, err = e(context.Background(), nil)
 		assert.Nil(t, err)
-		var report = reports.([]Report)[0]
-		assert.Equal(t, "jaeger", report.Name)
-		assert.Equal(t, (1 * time.Second).String(), report.Duration)
-		assert.Equal(t, "OK", report.Status)
-		assert.Zero(t, report.Error)
+		var json, _ = json.Marshal(&reports)
+		assert.Equal(t, `{"Name":"Test","Status":"OK"}`, string(json))
 	}
 
-	// Health error.
+	//Read
 	{
-		mockComponent.EXPECT().JaegerHealthChecks(context.Background()).Return([]Report{{Name: "jaeger", Duration: (1 * time.Second).String(), Status: KO.String(), Error: "fail"}}).Times(1)
-		var reports, err = e(context.Background(), nil)
+		var j = json.RawMessage(`{"Name":"Test","Status":"OK"}`)
+		mockComponent.EXPECT().ReadJaegerHealthChecks(context.Background()).Return(j).Times(1)
+		var reports, err = r(context.Background(), nil)
 		assert.Nil(t, err)
-		var report = reports.([]Report)[0]
-		assert.Equal(t, "jaeger", report.Name)
-		assert.Equal(t, (1 * time.Second).String(), report.Duration)
-		assert.Equal(t, "KO", report.Status)
-		assert.Equal(t, "fail", report.Error)
+		var json, _ = json.Marshal(&reports)
+		assert.Equal(t, `{"Name":"Test","Status":"OK"}`, string(json))
 	}
+
 }
 
 func TestRedisHealthCheckEndpoint(t *testing.T) {
@@ -80,60 +77,74 @@ func TestRedisHealthCheckEndpoint(t *testing.T) {
 	defer mockCtrl.Finish()
 	var mockComponent = mock.NewHealthChecker(mockCtrl)
 
-	var e = MakeRedisHealthCheckEndpoint(mockComponent)
+	var e = MakeExecRedisHealthCheckEndpoint(mockComponent)
+	var r = MakeReadRedisHealthCheckEndpoint(mockComponent)
 
-	// Health success.
+	//Exec
 	{
-		mockComponent.EXPECT().RedisHealthChecks(context.Background()).Return([]Report{{Name: "redis", Duration: (1 * time.Second).String(), Status: OK.String()}}).Times(1)
+		var j = json.RawMessage(`{"Name":"Test","Status":"OK"}`)
+		mockComponent.EXPECT().ExecRedisHealthChecks(context.Background()).Return(j).Times(1)
 		var reports, err = e(context.Background(), nil)
 		assert.Nil(t, err)
-		var report = reports.([]Report)[0]
-		assert.Equal(t, "redis", report.Name)
-		assert.Equal(t, (1 * time.Second).String(), report.Duration)
-		assert.Equal(t, "OK", report.Status)
-		assert.Zero(t, report.Error)
+		var json, _ = json.Marshal(&reports)
+		assert.Equal(t, `{"Name":"Test","Status":"OK"}`, string(json))
 	}
 
-	// Health error.
+	//Read
 	{
-		mockComponent.EXPECT().RedisHealthChecks(context.Background()).Return([]Report{{Name: "redis", Duration: (1 * time.Second).String(), Status: KO.String(), Error: "fail"}}).Times(1)
-		var reports, err = e(context.Background(), nil)
+		var j = json.RawMessage(`{"Name":"Test","Status":"OK"}`)
+		mockComponent.EXPECT().ReadRedisHealthChecks(context.Background()).Return(j).Times(1)
+		var reports, err = r(context.Background(), nil)
 		assert.Nil(t, err)
-		var report = reports.([]Report)[0]
-		assert.Equal(t, "redis", report.Name)
-		assert.Equal(t, (1 * time.Second).String(), report.Duration)
-		assert.Equal(t, "KO", report.Status)
-		assert.Equal(t, "fail", report.Error)
+		var json, _ = json.Marshal(&reports)
+		assert.Equal(t, `{"Name":"Test","Status":"OK"}`, string(json))
 	}
+
 }
 func TestSentryHealthCheckEndpoint(t *testing.T) {
 	var mockCtrl = gomock.NewController(t)
 	defer mockCtrl.Finish()
 	var mockComponent = mock.NewHealthChecker(mockCtrl)
 
-	var e = MakeSentryHealthCheckEndpoint(mockComponent)
+	var e = MakeExecSentryHealthCheckEndpoint(mockComponent)
+	var r = MakeReadSentryHealthCheckEndpoint(mockComponent)
 
-	// Health success.
+	//Exec
 	{
-		mockComponent.EXPECT().SentryHealthChecks(context.Background()).Return([]Report{{Name: "sentry", Duration: (1 * time.Second).String(), Status: OK.String()}}).Times(1)
+		var j = json.RawMessage(`{"Name":"Test","Status":"OK"}`)
+		mockComponent.EXPECT().ExecSentryHealthChecks(context.Background()).Return(j).Times(1)
 		var reports, err = e(context.Background(), nil)
 		assert.Nil(t, err)
-		var report = reports.([]Report)[0]
-		assert.Equal(t, "sentry", report.Name)
-		assert.Equal(t, (1 * time.Second).String(), report.Duration)
-		assert.Equal(t, "OK", report.Status)
-		assert.Zero(t, report.Error)
+		var json, _ = json.Marshal(&reports)
+		assert.Equal(t, `{"Name":"Test","Status":"OK"}`, string(json))
 	}
 
-	// Health error.
+	//Read
 	{
-		mockComponent.EXPECT().SentryHealthChecks(context.Background()).Return([]Report{{Name: "sentry", Duration: (1 * time.Second).String(), Status: KO.String(), Error: "fail"}}).Times(1)
+		var j = json.RawMessage(`{"Name":"Test","Status":"OK"}`)
+		mockComponent.EXPECT().ReadSentryHealthChecks(context.Background()).Return(j).Times(1)
+		var reports, err = r(context.Background(), nil)
+		assert.Nil(t, err)
+		var json, _ = json.Marshal(&reports)
+		assert.Equal(t, `{"Name":"Test","Status":"OK"}`, string(json))
+	}
+
+}
+
+func TestAllHealthCheckEndpoint(t *testing.T) {
+	var mockCtrl = gomock.NewController(t)
+	defer mockCtrl.Finish()
+	var mockComponent = mock.NewHealthChecker(mockCtrl)
+
+	var e = MakeAllHealthChecksEndpoint(mockComponent)
+
+	{
+		var j = json.RawMessage(`{"Redis":[{"Name":"Test","Status":"OK"}]}`)
+		mockComponent.EXPECT().AllHealthChecks(context.Background()).Return(j).Times(1)
 		var reports, err = e(context.Background(), nil)
 		assert.Nil(t, err)
-		var report = reports.([]Report)[0]
-		assert.Equal(t, "sentry", report.Name)
-		assert.Equal(t, (1 * time.Second).String(), report.Duration)
-		assert.Equal(t, "KO", report.Status)
-		assert.Equal(t, "fail", report.Error)
+		var json, _ = json.Marshal(&reports)
+		assert.Equal(t, `{"Redis":[{"Name":"Test","Status":"OK"}]}`, string(json))
 	}
+
 }

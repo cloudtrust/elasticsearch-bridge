@@ -1,7 +1,10 @@
 package health_test
 
+//go:generate mockgen -destination=./mock/logging.go -package=mock -mock_names=Logger=Logger github.com/go-kit/kit/log Logger
+
 import (
 	"context"
+	"encoding/json"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -19,21 +22,21 @@ func TestEndpointLoggingMW(t *testing.T) {
 	var mockLogger = mock.NewLogger(mockCtrl)
 	var mockComponent = mock.NewHealthChecker(mockCtrl)
 
-	var m = MakeEndpointLoggingMW(mockLogger)(MakeInfluxHealthCheckEndpoint(mockComponent))
+	var m = MakeEndpointLoggingMW(mockLogger)(MakeExecInfluxHealthCheckEndpoint(mockComponent))
 
 	// Context with correlation ID.
 	rand.Seed(time.Now().UnixNano())
 	var corrID = strconv.FormatUint(rand.Uint64(), 10)
 	var ctx = context.WithValue(context.Background(), "correlation_id", corrID)
-	var rep = []Report{{Name: "influx", Duration: (1 * time.Second).String(), Status: OK.String()}}
+	var rep = json.RawMessage(`{"JSON":"MOCK_CONTENT"}`)
 
 	// With correlation ID.
 	mockLogger.EXPECT().Log("correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
-	mockComponent.EXPECT().InfluxHealthChecks(ctx).Return(rep).Times(1)
+	mockComponent.EXPECT().ExecInfluxHealthChecks(ctx).Return(rep).Times(1)
 	m(ctx, nil)
 
 	// Without correlation ID.
-	mockComponent.EXPECT().InfluxHealthChecks(context.Background()).Return(rep).Times(1)
+	mockComponent.EXPECT().ExecInfluxHealthChecks(context.Background()).Return(rep).Times(1)
 	var f = func() {
 		m(context.Background(), nil)
 	}
@@ -51,182 +54,116 @@ func TestComponentLoggingMW(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	var corrID = strconv.FormatUint(rand.Uint64(), 10)
 	var ctx = context.WithValue(context.Background(), "correlation_id", corrID)
-	var rep = func(name string) []Report {
-		return []Report{{Name: name, Duration: (1 * time.Second).String(), Status: OK.String()}}
-	}
+	var rep = json.RawMessage(`{"JSON":"MOCK_CONTENT"}`)
 
 	// InfluxHealthChecks.
 	{
-		mockComponent.EXPECT().InfluxHealthChecks(ctx).Return(rep("influx")).Times(1)
-		mockLogger.EXPECT().Log("unit", "InfluxHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
-		m.InfluxHealthChecks(ctx)
+		mockComponent.EXPECT().ExecInfluxHealthChecks(ctx).Return(rep).Times(1)
+		mockLogger.EXPECT().Log("unit", "ExecInfluxHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
+		m.ExecInfluxHealthChecks(ctx)
+
+		mockComponent.EXPECT().ReadInfluxHealthChecks(ctx).Return(rep).Times(1)
+		mockLogger.EXPECT().Log("unit", "ReadInfluxHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
+		m.ReadInfluxHealthChecks(ctx)
 
 		// Without correlation ID.
-		mockComponent.EXPECT().InfluxHealthChecks(context.Background()).Return(rep("influx")).Times(1)
+		mockComponent.EXPECT().ExecInfluxHealthChecks(context.Background()).Return(rep).Times(1)
 		var f = func() {
-			m.InfluxHealthChecks(context.Background())
+			m.ExecInfluxHealthChecks(context.Background())
 		}
 		assert.Panics(t, f)
+
+		mockComponent.EXPECT().ReadInfluxHealthChecks(context.Background()).Return(rep).Times(1)
+		var g = func() {
+			m.ReadInfluxHealthChecks(context.Background())
+		}
+		assert.Panics(t, g)
 	}
 
 	// JaegerHealthChecks.
 	{
-		mockComponent.EXPECT().JaegerHealthChecks(ctx).Return(rep("jaeger")).Times(1)
-		mockLogger.EXPECT().Log("unit", "JaegerHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
-		m.JaegerHealthChecks(ctx)
+		mockComponent.EXPECT().ExecJaegerHealthChecks(ctx).Return(rep).Times(1)
+		mockLogger.EXPECT().Log("unit", "ExecJaegerHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
+		m.ExecJaegerHealthChecks(ctx)
+
+		mockComponent.EXPECT().ReadJaegerHealthChecks(ctx).Return(rep).Times(1)
+		mockLogger.EXPECT().Log("unit", "ReadJaegerHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
+		m.ReadJaegerHealthChecks(ctx)
 
 		// Without correlation ID.
-		mockComponent.EXPECT().JaegerHealthChecks(context.Background()).Return(rep("jaeger")).Times(1)
+		mockComponent.EXPECT().ExecJaegerHealthChecks(context.Background()).Return(rep).Times(1)
 		var f = func() {
-			m.JaegerHealthChecks(context.Background())
+			m.ExecJaegerHealthChecks(context.Background())
 		}
 		assert.Panics(t, f)
+
+		mockComponent.EXPECT().ReadJaegerHealthChecks(context.Background()).Return(rep).Times(1)
+		var g = func() {
+			m.ReadJaegerHealthChecks(context.Background())
+		}
+		assert.Panics(t, g)
 	}
 
 	// RedisHealthChecks.
 	{
-		mockComponent.EXPECT().RedisHealthChecks(ctx).Return(rep("redis")).Times(1)
-		mockLogger.EXPECT().Log("unit", "RedisHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
-		m.RedisHealthChecks(ctx)
+		mockComponent.EXPECT().ExecRedisHealthChecks(ctx).Return(rep).Times(1)
+		mockLogger.EXPECT().Log("unit", "ExecRedisHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
+		m.ExecRedisHealthChecks(ctx)
+
+		mockComponent.EXPECT().ReadRedisHealthChecks(ctx).Return(rep).Times(1)
+		mockLogger.EXPECT().Log("unit", "ReadRedisHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
+		m.ReadRedisHealthChecks(ctx)
 
 		// Without correlation ID.
-		mockComponent.EXPECT().RedisHealthChecks(context.Background()).Return(rep("redis")).Times(1)
+		mockComponent.EXPECT().ExecRedisHealthChecks(context.Background()).Return(rep).Times(1)
 		var f = func() {
-			m.RedisHealthChecks(context.Background())
+			m.ExecRedisHealthChecks(context.Background())
 		}
 		assert.Panics(t, f)
+
+		mockComponent.EXPECT().ReadRedisHealthChecks(context.Background()).Return(rep).Times(1)
+		var g = func() {
+			m.ReadRedisHealthChecks(context.Background())
+		}
+		assert.Panics(t, g)
 	}
- 
+
 	// SentryHealthChecks.
 	{
-		mockComponent.EXPECT().SentryHealthChecks(ctx).Return(rep("sentry")).Times(1)
-		mockLogger.EXPECT().Log("unit", "SentryHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
-		m.SentryHealthChecks(ctx)
+		mockComponent.EXPECT().ExecSentryHealthChecks(ctx).Return(rep).Times(1)
+		mockLogger.EXPECT().Log("unit", "ExecSentryHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
+		m.ExecSentryHealthChecks(ctx)
+
+		mockComponent.EXPECT().ReadSentryHealthChecks(ctx).Return(rep).Times(1)
+		mockLogger.EXPECT().Log("unit", "ReadSentryHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
+		m.ReadSentryHealthChecks(ctx)
 
 		// Without correlation ID.
-		mockComponent.EXPECT().SentryHealthChecks(context.Background()).Return(rep("sentry")).Times(1)
+		mockComponent.EXPECT().ExecSentryHealthChecks(context.Background()).Return(rep).Times(1)
 		var f = func() {
-			m.SentryHealthChecks(context.Background())
+			m.ExecSentryHealthChecks(context.Background())
 		}
 		assert.Panics(t, f)
+
+		mockComponent.EXPECT().ReadSentryHealthChecks(context.Background()).Return(rep).Times(1)
+		var g = func() {
+			m.ReadSentryHealthChecks(context.Background())
+		}
+		assert.Panics(t, g)
 	}
 
 	// AllHealthChecks.
 	{
-		var reply = map[string]string{"influx": "OK", "jaeger": "OK", "redis": "OK", "sentry": "OK"}
-		mockComponent.EXPECT().AllHealthChecks(ctx).Return(reply).Times(1)
+		var report = json.RawMessage(`{"influx":[{"Name":"sentry","Duration":"1s","Status":"OK","Error":""}], "redis":[{"Name":"redis","Duration":"1s","Status":"OK","Error":""}]}`)
+		mockComponent.EXPECT().AllHealthChecks(ctx).Return(report).Times(1)
 		mockLogger.EXPECT().Log("unit", "AllHealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
 		m.AllHealthChecks(ctx)
 
 		// Without correlation ID.
-		mockComponent.EXPECT().AllHealthChecks(context.Background()).Return(reply).Times(1)
+		mockComponent.EXPECT().AllHealthChecks(context.Background()).Return(report).Times(1)
 		var f = func() {
 			m.AllHealthChecks(context.Background())
 		}
 		assert.Panics(t, f)
 	}
-}
-
-func TestInfluxModuleLoggingMW(t *testing.T) {
-	var mockCtrl = gomock.NewController(t)
-	defer mockCtrl.Finish()
-	var mockLogger = mock.NewLogger(mockCtrl)
-	var mockModule = mock.NewInfluxHealthChecker(mockCtrl)
-
-	var m = MakeInfluxModuleLoggingMW(mockLogger)(mockModule)
-
-	// Context with correlation ID.
-	rand.Seed(time.Now().UnixNano())
-	var corrID = strconv.FormatUint(rand.Uint64(), 10)
-	var ctx = context.WithValue(context.Background(), "correlation_id", corrID)
-	var rep = []InfluxReport{{Name: "influx", Duration: (1 * time.Second), Status: OK}}
-
-	mockModule.EXPECT().HealthChecks(ctx).Return(rep).Times(1)
-	mockLogger.EXPECT().Log("unit", "HealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
-	m.HealthChecks(ctx)
-
-	// Without correlation ID.
-	mockModule.EXPECT().HealthChecks(context.Background()).Return(rep).Times(1)
-	var f = func() {
-		m.HealthChecks(context.Background())
-	}
-	assert.Panics(t, f)
-}
-
-func TestJaegerModuleLoggingMW(t *testing.T) {
-	var mockCtrl = gomock.NewController(t)
-	defer mockCtrl.Finish()
-	var mockLogger = mock.NewLogger(mockCtrl)
-	var mockModule = mock.NewJaegerHealthChecker(mockCtrl)
-
-	var m = MakeJaegerModuleLoggingMW(mockLogger)(mockModule)
-
-	// Context with correlation ID.
-	rand.Seed(time.Now().UnixNano())
-	var corrID = strconv.FormatUint(rand.Uint64(), 10)
-	var ctx = context.WithValue(context.Background(), "correlation_id", corrID)
-	var rep = []JaegerReport{{Name: "jaeger", Duration: (1 * time.Second), Status: OK}}
-
-	mockModule.EXPECT().HealthChecks(ctx).Return(rep).Times(1)
-	mockLogger.EXPECT().Log("unit", "HealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
-	m.HealthChecks(ctx)
-
-	// Without correlation ID.
-	mockModule.EXPECT().HealthChecks(context.Background()).Return(rep).Times(1)
-	var f = func() {
-		m.HealthChecks(context.Background())
-	}
-	assert.Panics(t, f)
-}
-
-func TestRedisModuleLoggingMW(t *testing.T) {
-	var mockCtrl = gomock.NewController(t)
-	defer mockCtrl.Finish()
-	var mockLogger = mock.NewLogger(mockCtrl)
-	var mockModule = mock.NewRedisHealthChecker(mockCtrl)
-
-	var m = MakeRedisModuleLoggingMW(mockLogger)(mockModule)
-
-	// Context with correlation ID.
-	rand.Seed(time.Now().UnixNano())
-	var corrID = strconv.FormatUint(rand.Uint64(), 10)
-	var ctx = context.WithValue(context.Background(), "correlation_id", corrID)
-	var rep = []RedisReport{{Name: "redis", Duration: (1 * time.Second), Status: OK}}
-
-	mockModule.EXPECT().HealthChecks(ctx).Return(rep).Times(1)
-	mockLogger.EXPECT().Log("unit", "HealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
-	m.HealthChecks(ctx)
-
-	// Without correlation ID.
-	mockModule.EXPECT().HealthChecks(context.Background()).Return(rep).Times(1)
-	var f = func() {
-		m.HealthChecks(context.Background())
-	}
-	assert.Panics(t, f)
-}
-
-func TestSentryModuleLoggingMW(t *testing.T) {
-	var mockCtrl = gomock.NewController(t)
-	defer mockCtrl.Finish()
-	var mockLogger = mock.NewLogger(mockCtrl)
-	var mockModule = mock.NewSentryHealthChecker(mockCtrl)
-
-	var m = MakeSentryModuleLoggingMW(mockLogger)(mockModule)
-
-	// Context with correlation ID.
-	rand.Seed(time.Now().UnixNano())
-	var corrID = strconv.FormatUint(rand.Uint64(), 10)
-	var ctx = context.WithValue(context.Background(), "correlation_id", corrID)
-	var rep = []SentryReport{{Name: "sentry", Duration: (1 * time.Second), Status: OK}}
-
-	mockModule.EXPECT().HealthChecks(ctx).Return(rep).Times(1)
-	mockLogger.EXPECT().Log("unit", "HealthChecks", "correlation_id", corrID, "took", gomock.Any()).Return(nil).Times(1)
-	m.HealthChecks(ctx)
-
-	// Without correlation ID.
-	mockModule.EXPECT().HealthChecks(context.Background()).Return(rep).Times(1)
-	var f = func() {
-		m.HealthChecks(context.Background())
-	}
-	assert.Panics(t, f)
 }

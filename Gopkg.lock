@@ -2,10 +2,29 @@
 
 
 [[projects]]
+  branch = "dev"
+  name = "github.com/AsynkronIT/protoactor-go"
+  packages = [
+    "actor",
+    "eventstream",
+    "internal/queue/goring",
+    "internal/queue/mpsc",
+    "log",
+    "mailbox"
+  ]
+  revision = "3992780c0af683deb5ec3746f4ec5845139c6e42"
+
+[[projects]]
   name = "github.com/VividCortex/gohistogram"
   packages = ["."]
   revision = "51564d9861991fb0ad0f531c99ef602d0f9866e6"
   version = "v1.0.0"
+
+[[projects]]
+  name = "github.com/Workiva/go-datastructures"
+  packages = ["queue"]
+  revision = "01f52d4880ca171ab1033bb0ee03cda8e0a31cc3"
+  version = "v1.0.46"
 
 [[projects]]
   name = "github.com/apache/thrift"
@@ -20,16 +39,42 @@
   version = "2018.01.18"
 
 [[projects]]
+  branch = "initial"
+  name = "github.com/cloudtrust/common-healthcheck"
+  packages = ["."]
+  revision = "d4b44155b8d9fa904f3817bca3345441502d9818"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/cloudtrust/flaki"
+  packages = ["."]
+  revision = "0a406845e41525fa5b1469b5b28e838adf8b95b1"
+
+[[projects]]
+  branch = "v1.2"
   name = "github.com/cloudtrust/flaki-service"
   packages = [
     "api/fb",
+    "internal/flakid",
     "internal/flakid/mock",
     "pkg/flaki",
     "pkg/health",
-    "pkg/health/mock"
+    "pkg/health/mock",
+    "pkg/job"
   ]
-  revision = "62db463eb7a37b5a00898b11e62738fbf1df62c6"
-  version = "1.1"
+  revision = "bd729017223feed184efc69997a9b29a4daab86a"
+
+[[projects]]
+  branch = "initial"
+  name = "github.com/cloudtrust/go-jobs"
+  packages = [
+    ".",
+    "actor",
+    "job",
+    "lock",
+    "status"
+  ]
+  revision = "09972d0b71cc2c130e750d4019157891445147f7"
 
 [[projects]]
   branch = "master"
@@ -48,6 +93,19 @@
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
+
+[[projects]]
+  name = "github.com/emirpasic/gods"
+  packages = [
+    "containers",
+    "lists",
+    "lists/singlylinkedlist",
+    "stacks",
+    "stacks/linkedliststack",
+    "utils"
+  ]
+  revision = "f6c17b524822278a87e3b3bd809fec33b51f5b46"
+  version = "v1.9.0"
 
 [[projects]]
   name = "github.com/fsnotify/fsnotify"
@@ -102,6 +160,16 @@
   packages = ["."]
   revision = "a389bdde4dd695d414e47b755e95e72b7826432c"
   version = "v4.1.0"
+
+[[projects]]
+  name = "github.com/gogo/protobuf"
+  packages = [
+    "gogoproto",
+    "proto",
+    "protoc-gen-gogo/descriptor"
+  ]
+  revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -204,6 +272,12 @@
   version = "v1.0.2"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/orcaman/concurrent-map"
+  packages = ["."]
+  revision = "a05df785d2dcc16310fb997ee1702100d047cfe1"
+
+[[projects]]
   name = "github.com/pelletier/go-toml"
   packages = ["."]
   revision = "acdc4509485b587f5e675510c4f2c63e90ff68a8"
@@ -286,6 +360,12 @@
   packages = ["metrics"]
   revision = "4267858c0679cd4e47cefed8d7f70fd386cfb567"
   version = "v1.4.0"
+
+[[projects]]
+  name = "github.com/victorcoder/dkron"
+  packages = ["cron"]
+  revision = "c1cf8fff41321ca422add70bf1783c309b669cbc"
+  version = "v0.9.8"
 
 [[projects]]
   branch = "master"
@@ -374,6 +454,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7ce57f2cddfc9d6902e1fe4bfd4a1e6051ef8d6bfd598fde5c98f2aa261c1926"
+  inputs-digest = "b66a58013c13dce6607b7a8c6bf766684382d148dc5f308ead13c3bc4eb50db5"
   solver-name = "gps-cdcl"
   solver-version = 1
