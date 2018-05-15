@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/cloudtrust/flaki-service/pkg/health"
-	"github.com/cloudtrust/flaki-service/pkg/health/mock"
+	. "github.com/cloudtrust/elasticsearch-bridge/pkg/health"
+	"github.com/cloudtrust/elasticsearch-bridge/pkg/health/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )

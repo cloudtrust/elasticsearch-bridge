@@ -1,6 +1,5 @@
-package flakid
+package elasticsearch_bridge
 
-//go:generate mockgen -source=instrumenting.go -destination=./mock/instrumenting.go -package=mock -mock_names=Influx=Influx,GoKitMetrics=GoKitMetrics github.com/cloudtrust/flaki-service/cmd Influx,GoKitMetrics
 
 import (
 	"time"

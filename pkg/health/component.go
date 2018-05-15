@@ -71,9 +71,9 @@ type SentryHealthChecker interface {
 	HealthChecks(context.Context) []common.SentryReport
 }
 
-// StorageModule is the interface of the module that stores the health reports
+// StoreModule is the interface of the module that stores the health reports
 // in the DB.
-type StorageModule interface {
+type StoreModule interface {
 	Read(name string) (StoredReport, error)
 	Update(unit string, validity time.Duration, reports json.RawMessage) error
 }
@@ -84,12 +84,12 @@ type Component struct {
 	jaeger              JaegerHealthChecker
 	redis               RedisHealthChecker
 	sentry              SentryHealthChecker
-	storage             StorageModule
+	storage             StoreModule
 	healthCheckValidity map[string]time.Duration
 }
 
 // NewComponent returns the health component.
-func NewComponent(influx InfluxHealthChecker, jaeger JaegerHealthChecker, redis RedisHealthChecker, sentry SentryHealthChecker, storage StorageModule, healthCheckValidity map[string]time.Duration) *Component {
+func NewComponent(influx InfluxHealthChecker, jaeger JaegerHealthChecker, redis RedisHealthChecker, sentry SentryHealthChecker, storage StoreModule, healthCheckValidity map[string]time.Duration) *Component {
 	return &Component{
 		influx:              influx,
 		jaeger:              jaeger,

@@ -39,24 +39,24 @@ type StoredReport struct{
 	ValidUntil time.Time
 }
 
-// CockroachModule is the module that save health checks results in Cockroach DB.
-type CockroachModule struct {
+// StorageModule is the module that save health checks results in Storage DB.
+type StorageModule struct {
 	componentName string
 	componentID   string
-	db            Cockroach
+	db            Storage
 }
 
-type Cockroach interface {
+type Storage interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 }
 
-// NewCockroachModule returns the cockroach storage module.
-func NewCockroachModule(componentName, componentID string, db Cockroach) *CockroachModule {
+// NewStorageModule returns the cockroach storage module.
+func NewStorageModule(componentName, componentID string, db Storage) *StorageModule {
 	// Init DB: create health table.
 	db.Exec(createHealthTblStmt)
 
-	return &CockroachModule{
+	return &StorageModule{
 		componentName: componentName,
 		componentID:   componentID,
 		db:            db,
@@ -64,19 +64,19 @@ func NewCockroachModule(componentName, componentID string, db Cockroach) *Cockro
 }
 
 // Update updates the health checks reports stored in DB with the values 'jsonReports'.
-func (c *CockroachModule) Update(unit string, validity time.Duration, jsonReports json.RawMessage) error {
+func (c *StorageModule) Update(unit string, validity time.Duration, jsonReports json.RawMessage) error {
 	var now = time.Now()
 	var _, err = c.db.Exec(upsertHealthStmt, c.componentName, c.componentID, unit, string(jsonReports), now.UTC(), now.Add(validity).UTC())
 
 	if err != nil {
 		return errors.Wrapf(err, "component '%s' with id '%s' could not update health check for unit '%s'", c.componentName, c.componentID, unit)
 	}
-	
+
 	return nil
 }
 
 // Read reads the reports in DB.
-func (c *CockroachModule) Read(unit string) (StoredReport, error) {
+func (c *StorageModule) Read(unit string) (StoredReport, error) {
 	var rows, err = c.db.Query(selectHealthStmt, c.componentName, c.componentID, unit)
 	if err != nil {
 		return StoredReport{}, errors.Wrapf(err, "component '%s' with id '%s' could not read health check '%s'", c.componentName, c.componentID, unit)
@@ -110,7 +110,7 @@ func (c *CockroachModule) Read(unit string) (StoredReport, error) {
 }
 
 // Clean deletes the old test reports that are no longer valid from the health DB table.
-func (c *CockroachModule) Clean() error {
+func (c *StorageModule) Clean() error {
 	var _, err = c.db.Exec(cleanHealthStmt, c.componentName, time.Now().UTC())
 
 	if err != nil {

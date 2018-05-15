@@ -1,14 +1,14 @@
 package health_test
 
-//go:generate mockgen -destination=./mock/component.go -package=mock -mock_names=HealthChecker=HealthChecker github.com/cloudtrust/flaki-service/pkg/health HealthChecker
+//go:generate mockgen -destination=./mock/component.go -package=mock -mock_names=HealthChecker=HealthChecker github.com/cloudtrust/elasticsearch-bridge/pkg/health HealthChecker
 
 import (
 	"context"
 	"encoding/json"
 	"testing"
 
-	. "github.com/cloudtrust/flaki-service/pkg/health"
-	"github.com/cloudtrust/flaki-service/pkg/health/mock"
+	. "github.com/cloudtrust/elasticsearch-bridge/pkg/health"
+	"github.com/cloudtrust/elasticsearch-bridge/pkg/health/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )

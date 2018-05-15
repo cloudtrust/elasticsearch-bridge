@@ -1,10 +1,14 @@
-package flakid
+package elasticsearch_bridge
+
+
+//go:generate mockgen -source=logging.go -destination=./mock/logging.go -package=mock -mock_names=Redis=Redis github.com/cloudtrust/elasticsearch_bridge/cmd Redis
+
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/cloudtrust/flaki-service/internal/flakid/mock"
+	"github.com/cloudtrust/elasticsearch-bridge/internal/elasticsearch_bridge/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +20,7 @@ func TestLogstashRedisWriter(t *testing.T) {
 
 	var w = NewLogstashRedisWriter(mockRedis, "redisKey")
 
-	var jsonLog = "{\"msg\":\"logstash log\",\"caller\":\"flakid.go:120\",\"component_name\":\"flaki-service\",\"component_version\":\"1.0\",\"environment\":\"DEV\",\"git_commit\":\"5fb7de0d7ae3f3d5f5d6a322b2344bdab645fd33\",\"ts\":\"2018-02-13T06:27:07.123915229Z\"}"
+	var jsonLog = "{\"msg\":\"logstash log\",\"caller\":\"elasticsearch_bridge.go:120\",\"component_name\":\"elasticsearch-bridge\",\"component_version\":\"1.0\",\"environment\":\"DEV\",\"git_commit\":\"5fb7de0d7ae3f3d5f5d6a322b2344bdab645fd33\",\"ts\":\"2018-02-13T06:27:07.123915229Z\"}"
 	mockRedis.EXPECT().Send("RPUSH", "redisKey", gomock.Any()).Return(nil).Times(1)
 	w.Write([]byte(jsonLog))
 }
@@ -24,8 +28,8 @@ func TestLogstashRedisWriter(t *testing.T) {
 func TestLogstashEncode(t *testing.T) {
 	var logs = map[string]string{
 		"msg":               "logstash log",
-		"caller":            "flakid.go:120",
-		"component_name":    "flaki-service",
+		"caller":            "elasticsearch_bridge.go:120",
+		"component_name":    "elasticsearch-bridge",
 		"component_version": "1.0",
 		"environment":       "DEV",
 		"git_commit":        "5fb7de0d7ae3f3d5f5d6a322b2344bdab645fd33",
@@ -43,8 +47,8 @@ func TestLogstashEncode(t *testing.T) {
 	assert.Equal(t, "logstash log", m["@message"])
 
 	var fields = m["@fields"].(map[string]interface{})
-	assert.Equal(t, "flakid.go:120", fields["caller"])
-	assert.Equal(t, "flaki-service", fields["component_name"])
+	assert.Equal(t, "elasticsearch_bridge.go:120", fields["caller"])
+	assert.Equal(t, "elasticsearch-bridge", fields["component_name"])
 	assert.Equal(t, "1.0", fields["component_version"])
 	assert.Equal(t, "DEV", fields["environment"])
 	assert.Equal(t, "5fb7de0d7ae3f3d5f5d6a322b2344bdab645fd33", fields["git_commit"])

@@ -1,10 +1,13 @@
-package flakid
+package elasticsearch_bridge
+
+//go:generate mockgen -source=instrumenting.go -destination=./mock/instrumenting.go -package=mock -mock_names=Influx=Influx,GoKitMetrics=GoKitMetrics github.com/cloudtrust/elasticsearch-bridge/cmd Influx,GoKitMetrics
+
 
 import (
 	"testing"
 	"time"
 
-	"github.com/cloudtrust/flaki-service/internal/flakid/mock"
+	"github.com/cloudtrust/elasticsearch-bridge/internal/elasticsearch_bridge/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )

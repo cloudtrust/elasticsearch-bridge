@@ -1,20 +1,19 @@
 package health_test
 
-//go:generate mockgen -destination=./mock/module.go -package=mock -mock_names=InfluxHealthChecker=InfluxHealthChecker,JaegerHealthChecker=JaegerHealthChecker,RedisHealthChecker=RedisHealthChecker,SentryHealthChecker=SentryHealthChecker,StorageModule=StorageModule  github.com/cloudtrust/flaki-service/pkg/health InfluxHealthChecker,JaegerHealthChecker,RedisHealthChecker,SentryHealthChecker,StorageModule
-
+//go:generate mockgen -destination=./mock/module.go -package=mock -mock_names=InfluxHealthChecker=InfluxHealthChecker,JaegerHealthChecker=JaegerHealthChecker,RedisHealthChecker=RedisHealthChecker,SentryHealthChecker=SentryHealthChecker,StoreModule=StoreModule  github.com/cloudtrust/elasticsearch-bridge/pkg/health InfluxHealthChecker,JaegerHealthChecker,RedisHealthChecker,SentryHealthChecker,StoreModule
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
-	"fmt"
 
-	. "github.com/cloudtrust/flaki-service/pkg/health"
-	"github.com/cloudtrust/flaki-service/pkg/health/mock"
+	common "github.com/cloudtrust/common-healthcheck"
+	. "github.com/cloudtrust/elasticsearch-bridge/pkg/health"
+	"github.com/cloudtrust/elasticsearch-bridge/pkg/health/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	common "github.com/cloudtrust/common-healthcheck"
 )
 
 func TestHealthChecks(t *testing.T) {
@@ -24,7 +23,7 @@ func TestHealthChecks(t *testing.T) {
 	var mockJaegerModule = mock.NewJaegerHealthChecker(mockCtrl)
 	var mockRedisModule = mock.NewRedisHealthChecker(mockCtrl)
 	var mockSentryModule = mock.NewSentryHealthChecker(mockCtrl)
-	var mockStorage = mock.NewStorageModule(mockCtrl)
+	var mockStorage = mock.NewStoreModule(mockCtrl)
 	var m = map[string]time.Duration{
 		"influx": 1 * time.Minute,
 		"jaeger": 1 * time.Minute,
@@ -34,19 +33,19 @@ func TestHealthChecks(t *testing.T) {
 
 	var c = NewComponent(mockInfluxModule, mockJaegerModule, mockRedisModule, mockSentryModule, mockStorage, m)
 
-	var ( 
+	var (
 		influxReports    = []common.InfluxReport{{Name: "influx", Duration: time.Duration(1 * time.Second), Status: common.OK}}
 		jaegerReports    = []common.JaegerReport{{Name: "jaeger", Duration: time.Duration(1 * time.Second), Status: common.OK}}
 		redisReports     = []common.RedisReport{{Name: "redis", Duration: time.Duration(1 * time.Second), Status: common.OK}}
 		sentryReports    = []common.SentryReport{{Name: "sentry", Duration: time.Duration(1 * time.Second), Status: common.OK}}
 		makeStoredReport = func(name string) StoredReport {
 			return StoredReport{
-				ComponentID: "000-000-000-00",
-				ComponentName: "flaki",
+				ComponentID:     "000-000-000-00",
+				ComponentName:   "elasticsearch-bridge",
 				HealthcheckUnit: name,
-				Reports: json.RawMessage(`[{"name":"XXX", "status":"OK", "duration":"1s"}]`),
-				LastUpdated: time.Now(),
-				ValidUntil: time.Now().Add(1 * time.Hour),
+				Reports:         json.RawMessage(`[{"name":"XXX", "status":"OK", "duration":"1s"}]`),
+				LastUpdated:     time.Now(),
+				ValidUntil:      time.Now().Add(1 * time.Hour),
 			}
 		}
 	)
@@ -56,7 +55,7 @@ func TestHealthChecks(t *testing.T) {
 	mockStorage.EXPECT().Update("influx", m["influx"], gomock.Any()).Times(1)
 	{
 		var report = c.ExecInfluxHealthChecks(context.Background())
-	//	var json, _ = json.Marshal(&report)
+		//	var json, _ = json.Marshal(&report)
 		assert.Equal(t, `[{"name":"influx","duration":"1s","status":"OK","error":""}]`, string(report))
 	}
 
@@ -108,7 +107,7 @@ func TestHealthChecksFail(t *testing.T) {
 	var mockJaegerModule = mock.NewJaegerHealthChecker(mockCtrl)
 	var mockRedisModule = mock.NewRedisHealthChecker(mockCtrl)
 	var mockSentryModule = mock.NewSentryHealthChecker(mockCtrl)
-	var mockStorage = mock.NewStorageModule(mockCtrl)
+	var mockStorage = mock.NewStoreModule(mockCtrl)
 	var m = map[string]time.Duration{
 		"influx": 1 * time.Minute,
 		"jaeger": 1 * time.Minute,
@@ -125,12 +124,12 @@ func TestHealthChecksFail(t *testing.T) {
 		sentryReports    = []common.SentryReport{{Name: "sentry", Duration: time.Duration(1 * time.Second), Status: common.KO, Error: fmt.Errorf("fail")}}
 		makeStoredReport = func(name string) StoredReport {
 			return StoredReport{
-				ComponentID: "000-000-000-00",
-				ComponentName: "flaki",
+				ComponentID:     "000-000-000-00",
+				ComponentName:   "elasticsearch-bridge",
 				HealthcheckUnit: name,
-				Reports: json.RawMessage(`[{"name":"XXX", "status":"OK", "duration":"1s"}]`),
-				LastUpdated: time.Now(),
-				ValidUntil: time.Now().Add(1 * time.Hour),
+				Reports:         json.RawMessage(`[{"name":"XXX", "status":"OK", "duration":"1s"}]`),
+				LastUpdated:     time.Now(),
+				ValidUntil:      time.Now().Add(1 * time.Hour),
 			}
 		}
 	)

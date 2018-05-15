@@ -1,4 +1,4 @@
-package flakid
+package elasticsearch_bridge
 
 import (
 	"fmt"

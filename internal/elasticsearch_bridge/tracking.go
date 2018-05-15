@@ -1,4 +1,4 @@
-package flakid
+package elasticsearch_bridge
 
 import (
 	sentry "github.com/getsentry/raven-go"

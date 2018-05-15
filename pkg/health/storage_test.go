@@ -1,6 +1,6 @@
 package health_test
 
-//go:generate mockgen -destination=./mock/cockroach.go -package=mock -mock_names=Cockroach=Cockroach  github.com/cloudtrust/flaki-service/pkg/health Cockroach
+//go:generate mockgen -destination=./mock/storage.go -package=mock -mock_names=Storage=Storage  github.com/cloudtrust/elasticsearch-bridge/pkg/health Storage
 
 import (
 	"encoding/json"
@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/cloudtrust/flaki-service/pkg/health"
-	"github.com/cloudtrust/flaki-service/pkg/health/mock"
+	. "github.com/cloudtrust/elasticsearch-bridge/pkg/health"
+	"github.com/cloudtrust/elasticsearch-bridge/pkg/health/mock"
 	"github.com/golang/mock/gomock"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -38,38 +38,38 @@ const (
 	cleanHealthStmt  = `DELETE from health WHERE (component_name = $1 AND valid_until < $2)`
 )
 
-func TestNewCockroachModule(t *testing.T) {
+func TestNewStorageModule(t *testing.T) {
 	var mockCtrl = gomock.NewController(t)
 	defer mockCtrl.Finish()
-	var mockCockroach = mock.NewCockroach(mockCtrl)
+	var mockStorage = mock.NewStorage(mockCtrl)
 	rand.Seed(time.Now().UnixNano())
 
 	var (
-		componentName = "flaki-service"
+		componentName = "elasticsearch-bridge"
 		componentID   = strconv.FormatUint(rand.Uint64(), 10)
 	)
 
-	mockCockroach.EXPECT().Exec(createHealthTblStmt).Return(nil, nil).Times(1)
-	_ = NewCockroachModule(componentName, componentID, mockCockroach)
+	mockStorage.EXPECT().Exec(createHealthTblStmt).Return(nil, nil).Times(1)
+	_ = NewStorageModule(componentName, componentID, mockStorage)
 }
 
 func TestUpdate(t *testing.T) {
 	var mockCtrl = gomock.NewController(t)
 	defer mockCtrl.Finish()
-	var mockCockroach = mock.NewCockroach(mockCtrl)
+	var mockStorage = mock.NewStorage(mockCtrl)
 	rand.Seed(time.Now().UnixNano())
 
 	var (
-		componentName = "flaki-service"
+		componentName = "elasticsearch_bridge"
 		componentID   = strconv.FormatUint(rand.Uint64(), 10)
 		unit          = "influx"
 		reports       = json.RawMessage(`{}`)
 	)
 
-	mockCockroach.EXPECT().Exec(createHealthTblStmt).Return(nil, nil).Times(1)
-	var m = NewCockroachModule(componentName, componentID, mockCockroach)
+	mockStorage.EXPECT().Exec(createHealthTblStmt).Return(nil, nil).Times(1)
+	var m = NewStorageModule(componentName, componentID, mockStorage)
 
-	mockCockroach.EXPECT().Exec(upsertHealthStmt, componentName, componentID, unit, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
+	mockStorage.EXPECT().Exec(upsertHealthStmt, componentName, componentID, unit, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
 	var err = m.Update(unit, 0, reports)
 	assert.Nil(t, err)
 }
@@ -77,20 +77,20 @@ func TestUpdate(t *testing.T) {
 func TestUpdateFail(t *testing.T) {
 	var mockCtrl = gomock.NewController(t)
 	defer mockCtrl.Finish()
-	var mockCockroach = mock.NewCockroach(mockCtrl)
+	var mockStorage = mock.NewStorage(mockCtrl)
 	rand.Seed(time.Now().UnixNano())
 
 	var (
-		componentName = "flaki-service"
+		componentName = "elasticsearch-bridge"
 		componentID   = strconv.FormatUint(rand.Uint64(), 10)
 		unit          = "influx"
 		reports       = json.RawMessage(`{}`)
 	)
 
-	mockCockroach.EXPECT().Exec(createHealthTblStmt).Return(nil, nil).Times(1)
-	var m = NewCockroachModule(componentName, componentID, mockCockroach)
+	mockStorage.EXPECT().Exec(createHealthTblStmt).Return(nil, nil).Times(1)
+	var m = NewStorageModule(componentName, componentID, mockStorage)
 
-	mockCockroach.EXPECT().Exec(upsertHealthStmt, componentName, componentID, unit, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("fail")).Times(1)
+	mockStorage.EXPECT().Exec(upsertHealthStmt, componentName, componentID, unit, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("fail")).Times(1)
 	var err = m.Update(unit, 0, reports)
 	assert.NotNil(t, err)
 }
