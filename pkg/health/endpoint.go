@@ -1,23 +1,27 @@
 package health
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
 
 	"github.com/go-kit/kit/endpoint"
 )
 
 // Endpoints wraps a service behind a set of endpoints.
 type Endpoints struct {
-	InfluxExecHealthCheck endpoint.Endpoint
-	InfluxReadHealthCheck endpoint.Endpoint
-	JaegerExecHealthCheck endpoint.Endpoint
-	JaegerReadHealthCheck endpoint.Endpoint
-	RedisExecHealthCheck  endpoint.Endpoint
-	RedisReadHealthCheck  endpoint.Endpoint
-	SentryExecHealthCheck endpoint.Endpoint
-	SentryReadHealthCheck endpoint.Endpoint
-	AllHealthChecks       endpoint.Endpoint
+	InfluxExecHealthCheck        endpoint.Endpoint
+	InfluxReadHealthCheck        endpoint.Endpoint
+	JaegerExecHealthCheck        endpoint.Endpoint
+	JaegerReadHealthCheck        endpoint.Endpoint
+	RedisExecHealthCheck         endpoint.Endpoint
+	RedisReadHealthCheck         endpoint.Endpoint
+	SentryExecHealthCheck        endpoint.Endpoint
+	SentryReadHealthCheck        endpoint.Endpoint
+	FlakiExecHealthCheck         endpoint.Endpoint
+	FlakiReadHealthCheck         endpoint.Endpoint
+	ElasticsearchExecHealthCheck endpoint.Endpoint
+	ElasticsearchReadHealthCheck endpoint.Endpoint
+	AllHealthChecks              endpoint.Endpoint
 }
 
 // HealthChecker is the health component interface.
@@ -30,6 +34,10 @@ type HealthChecker interface {
 	ReadRedisHealthChecks(context.Context) json.RawMessage
 	ExecSentryHealthChecks(context.Context) json.RawMessage
 	ReadSentryHealthChecks(context.Context) json.RawMessage
+	ExecFlakiHealthChecks(context.Context) json.RawMessage
+	ReadFlakiHealthChecks(context.Context) json.RawMessage
+	ExecElasticsearchHealthChecks(context.Context) json.RawMessage
+	ReadElasticsearchHealthChecks(context.Context) json.RawMessage
 	AllHealthChecks(context.Context) json.RawMessage
 }
 
@@ -94,6 +102,38 @@ func MakeExecSentryHealthCheckEndpoint(hc HealthChecker) endpoint.Endpoint {
 func MakeReadSentryHealthCheckEndpoint(hc HealthChecker) endpoint.Endpoint {
 	return func(ctx context.Context, req interface{}) (interface{}, error) {
 		return hc.ReadSentryHealthChecks(ctx), nil
+	}
+}
+
+// MakeExecElasticsearchHealthCheckEndpoint makes the ElasticsearchHealthCheck endpoint
+// that forces the execution of the health checks.
+func MakeExecElasticsearchHealthCheckEndpoint(hc HealthChecker) endpoint.Endpoint {
+	return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return hc.ExecElasticsearchHealthChecks(ctx), nil
+	}
+}
+
+// MakeReadElasticsearchHealthCheckEndpoint makes the ElasticsearchHealthCheck endpoint
+// that read the last health check status in DB.
+func MakeReadElasticsearchHealthCheckEndpoint(hc HealthChecker) endpoint.Endpoint {
+	return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return hc.ReadElasticsearchHealthChecks(ctx), nil
+	}
+}
+
+// MakeExecFlakiHealthCheckEndpoint makes the FlakiHealthCheck endpoint
+// that forces the execution of the health checks.
+func MakeExecFlakiHealthCheckEndpoint(hc HealthChecker) endpoint.Endpoint {
+	return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return hc.ExecFlakiHealthChecks(ctx), nil
+	}
+}
+
+// MakeReadFlakiHealthCheckEndpoint makes the SentryHealthCheck endpoint
+// that read the last health check status in DB.
+func MakeReadFlakiHealthCheckEndpoint(hc HealthChecker) endpoint.Endpoint {
+	return func(ctx context.Context, req interface{}) (interface{}, error) {
+		return hc.ReadFlakiHealthChecks(ctx), nil
 	}
 }
 

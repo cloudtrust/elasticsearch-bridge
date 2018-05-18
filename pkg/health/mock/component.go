@@ -46,6 +46,30 @@ func (mr *HealthCheckerMockRecorder) AllHealthChecks(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllHealthChecks", reflect.TypeOf((*HealthChecker)(nil).AllHealthChecks), arg0)
 }
 
+// ExecElasticsearchHealthChecks mocks base method
+func (m *HealthChecker) ExecElasticsearchHealthChecks(arg0 context.Context) json.RawMessage {
+	ret := m.ctrl.Call(m, "ExecElasticsearchHealthChecks", arg0)
+	ret0, _ := ret[0].(json.RawMessage)
+	return ret0
+}
+
+// ExecElasticsearchHealthChecks indicates an expected call of ExecElasticsearchHealthChecks
+func (mr *HealthCheckerMockRecorder) ExecElasticsearchHealthChecks(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecElasticsearchHealthChecks", reflect.TypeOf((*HealthChecker)(nil).ExecElasticsearchHealthChecks), arg0)
+}
+
+// ExecFlakiHealthChecks mocks base method
+func (m *HealthChecker) ExecFlakiHealthChecks(arg0 context.Context) json.RawMessage {
+	ret := m.ctrl.Call(m, "ExecFlakiHealthChecks", arg0)
+	ret0, _ := ret[0].(json.RawMessage)
+	return ret0
+}
+
+// ExecFlakiHealthChecks indicates an expected call of ExecFlakiHealthChecks
+func (mr *HealthCheckerMockRecorder) ExecFlakiHealthChecks(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecFlakiHealthChecks", reflect.TypeOf((*HealthChecker)(nil).ExecFlakiHealthChecks), arg0)
+}
+
 // ExecInfluxHealthChecks mocks base method
 func (m *HealthChecker) ExecInfluxHealthChecks(arg0 context.Context) json.RawMessage {
 	ret := m.ctrl.Call(m, "ExecInfluxHealthChecks", arg0)
@@ -92,6 +116,30 @@ func (m *HealthChecker) ExecSentryHealthChecks(arg0 context.Context) json.RawMes
 // ExecSentryHealthChecks indicates an expected call of ExecSentryHealthChecks
 func (mr *HealthCheckerMockRecorder) ExecSentryHealthChecks(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecSentryHealthChecks", reflect.TypeOf((*HealthChecker)(nil).ExecSentryHealthChecks), arg0)
+}
+
+// ReadElasticsearchHealthChecks mocks base method
+func (m *HealthChecker) ReadElasticsearchHealthChecks(arg0 context.Context) json.RawMessage {
+	ret := m.ctrl.Call(m, "ReadElasticsearchHealthChecks", arg0)
+	ret0, _ := ret[0].(json.RawMessage)
+	return ret0
+}
+
+// ReadElasticsearchHealthChecks indicates an expected call of ReadElasticsearchHealthChecks
+func (mr *HealthCheckerMockRecorder) ReadElasticsearchHealthChecks(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadElasticsearchHealthChecks", reflect.TypeOf((*HealthChecker)(nil).ReadElasticsearchHealthChecks), arg0)
+}
+
+// ReadFlakiHealthChecks mocks base method
+func (m *HealthChecker) ReadFlakiHealthChecks(arg0 context.Context) json.RawMessage {
+	ret := m.ctrl.Call(m, "ReadFlakiHealthChecks", arg0)
+	ret0, _ := ret[0].(json.RawMessage)
+	return ret0
+}
+
+// ReadFlakiHealthChecks indicates an expected call of ReadFlakiHealthChecks
+func (mr *HealthCheckerMockRecorder) ReadFlakiHealthChecks(arg0 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadFlakiHealthChecks", reflect.TypeOf((*HealthChecker)(nil).ReadFlakiHealthChecks), arg0)
 }
 
 // ReadInfluxHealthChecks mocks base method

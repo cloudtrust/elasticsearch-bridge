@@ -27,10 +27,12 @@ const (
 
 const (
 	// Names of the units in the health check http response and in the DB.
-	influxUnitName = "influx"
-	jaegerUnitName = "jaeger"
-	redisUnitName  = "redis"
-	sentryUnitName = "sentry"
+	influxUnitName        = "influx"
+	jaegerUnitName        = "jaeger"
+	redisUnitName         = "redis"
+	sentryUnitName        = "sentry"
+	flakiUnitName         = "flaki"
+	elasticsearchUnitName = "elasticsearch"
 )
 
 var statusName = []string{"OK", "KO", "Degraded", "Deactivated", "Unknown"}
@@ -71,6 +73,16 @@ type SentryHealthChecker interface {
 	HealthChecks(context.Context) []common.SentryReport
 }
 
+// FlakiHealthChecker is the interface of the flaki health check module.
+type FlakiHealthChecker interface {
+	HealthChecks(context.Context) []common.FlakiReport
+}
+
+// ElasticsearchHealthChecker is the interface of the elasticsearch health check module.
+type ElasticsearchHealthChecker interface {
+	HealthChecks(context.Context) []ElasticsearchReport
+}
+
 // StoreModule is the interface of the module that stores the health reports
 // in the DB.
 type StoreModule interface {
@@ -84,17 +96,23 @@ type Component struct {
 	jaeger              JaegerHealthChecker
 	redis               RedisHealthChecker
 	sentry              SentryHealthChecker
+	flaki               FlakiHealthChecker
+	elasticsearch       ElasticsearchHealthChecker
 	storage             StoreModule
 	healthCheckValidity map[string]time.Duration
 }
 
 // NewComponent returns the health component.
-func NewComponent(influx InfluxHealthChecker, jaeger JaegerHealthChecker, redis RedisHealthChecker, sentry SentryHealthChecker, storage StoreModule, healthCheckValidity map[string]time.Duration) *Component {
+func NewComponent(influx InfluxHealthChecker, jaeger JaegerHealthChecker, redis RedisHealthChecker,
+	sentry SentryHealthChecker, flaki FlakiHealthChecker, elasticsearch ElasticsearchHealthChecker,
+	storage StoreModule, healthCheckValidity map[string]time.Duration) *Component {
 	return &Component{
 		influx:              influx,
 		jaeger:              jaeger,
 		redis:               redis,
 		sentry:              sentry,
+		flaki:               flaki,
+		elasticsearch:       elasticsearch,
 		storage:             storage,
 		healthCheckValidity: healthCheckValidity,
 	}
@@ -157,6 +175,34 @@ func (c *Component) ReadSentryHealthChecks(ctx context.Context) json.RawMessage 
 	return c.readFromDB(sentryUnitName)
 }
 
+// ExecFlakiHealthChecks executes the health checks for Flaki.
+func (c *Component) ExecFlakiHealthChecks(ctx context.Context) json.RawMessage {
+	var reports = c.flaki.HealthChecks(ctx)
+	var jsonReports, _ = json.Marshal(reports)
+
+	c.storage.Update(flakiUnitName, c.healthCheckValidity[flakiUnitName], jsonReports)
+	return json.RawMessage(jsonReports)
+}
+
+// ReadFlakiHealthChecks read the health checks status in DB.
+func (c *Component) ReadFlakiHealthChecks(ctx context.Context) json.RawMessage {
+	return c.readFromDB(flakiUnitName)
+}
+
+// ExecElasticsearchHealthChecks executes the health checks for Flaki.
+func (c *Component) ExecElasticsearchHealthChecks(ctx context.Context) json.RawMessage {
+	var reports = c.elasticsearch.HealthChecks(ctx)
+	var jsonReports, _ = json.Marshal(reports)
+
+	c.storage.Update(elasticsearchUnitName, c.healthCheckValidity[elasticsearchUnitName], jsonReports)
+	return json.RawMessage(jsonReports)
+}
+
+// ReadElasticsearchHealthChecks read the health checks status in DB.
+func (c *Component) ReadElasticsearchHealthChecks(ctx context.Context) json.RawMessage {
+	return c.readFromDB(elasticsearchUnitName)
+}
+
 // AllHealthChecks call all component checks and build a general health report.
 func (c *Component) AllHealthChecks(ctx context.Context) json.RawMessage {
 	var reports = map[string]json.RawMessage{}
@@ -165,6 +211,8 @@ func (c *Component) AllHealthChecks(ctx context.Context) json.RawMessage {
 	reports[jaegerUnitName] = c.ReadJaegerHealthChecks(ctx)
 	reports[redisUnitName] = c.ReadRedisHealthChecks(ctx)
 	reports[sentryUnitName] = c.ReadSentryHealthChecks(ctx)
+	reports[flakiUnitName] = c.ReadFlakiHealthChecks(ctx)
+	reports[elasticsearchUnitName] = c.ReadElasticsearchHealthChecks(ctx)
 
 	var jsonReports, _ = json.Marshal(reports)
 	return json.RawMessage(jsonReports)
@@ -195,4 +243,12 @@ func (c *Component) readFromDB(unit string) json.RawMessage {
 
 	return storedReport.Reports
 
+}
+
+// err return the string error that will be in the health report
+func err(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

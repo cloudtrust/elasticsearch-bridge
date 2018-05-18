@@ -111,6 +111,42 @@ func (m *componentLoggingMW) ReadSentryHealthChecks(ctx context.Context) json.Ra
 }
 
 // componentLoggingMW implements Component.
+func (m *componentLoggingMW) ExecFlakiHealthChecks(ctx context.Context) json.RawMessage {
+	defer func(begin time.Time) {
+		m.logger.Log("unit", "ExecFlakiHealthChecks", "correlation_id", ctx.Value("correlation_id").(string), "took", time.Since(begin))
+	}(time.Now())
+
+	return m.next.ExecFlakiHealthChecks(ctx)
+}
+
+// componentLoggingMW implements Component.
+func (m *componentLoggingMW) ReadFlakiHealthChecks(ctx context.Context) json.RawMessage {
+	defer func(begin time.Time) {
+		m.logger.Log("unit", "ReadFlakiHealthChecks", "correlation_id", ctx.Value("correlation_id").(string), "took", time.Since(begin))
+	}(time.Now())
+
+	return m.next.ReadFlakiHealthChecks(ctx)
+}
+
+// componentLoggingMW implements Component.
+func (m *componentLoggingMW) ExecElasticsearchHealthChecks(ctx context.Context) json.RawMessage {
+	defer func(begin time.Time) {
+		m.logger.Log("unit", "ExecElasticsearchHealthChecks", "correlation_id", ctx.Value("correlation_id").(string), "took", time.Since(begin))
+	}(time.Now())
+
+	return m.next.ExecElasticsearchHealthChecks(ctx)
+}
+
+// componentLoggingMW implements Component.
+func (m *componentLoggingMW) ReadElasticsearchHealthChecks(ctx context.Context) json.RawMessage {
+	defer func(begin time.Time) {
+		m.logger.Log("unit", "ReadElasticsearchHealthChecks", "correlation_id", ctx.Value("correlation_id").(string), "took", time.Since(begin))
+	}(time.Now())
+
+	return m.next.ReadElasticsearchHealthChecks(ctx)
+}
+
+// componentLoggingMW implements Component.
 func (m *componentLoggingMW) AllHealthChecks(ctx context.Context) json.RawMessage {
 	defer func(begin time.Time) {
 		m.logger.Log("unit", "AllHealthChecks", "correlation_id", ctx.Value("correlation_id").(string), "took", time.Since(begin))

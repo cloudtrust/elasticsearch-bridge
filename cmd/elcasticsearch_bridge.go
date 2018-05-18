@@ -6,21 +6,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/pprof"
 	"os"
 	"os/signal"
 	"sort"
+	"strconv"
 	"syscall"
 	"time"
-	"math/rand"
-	"strconv"
 
 	common "github.com/cloudtrust/common-healthcheck"
 	fb_flaki "github.com/cloudtrust/elasticsearch-bridge/api/fb"
 	elasticsearch_bridge "github.com/cloudtrust/elasticsearch-bridge/internal/elasticsearch_bridge"
-	health_job "github.com/cloudtrust/elasticsearch-bridge/pkg/job"
 	"github.com/cloudtrust/elasticsearch-bridge/pkg/health"
+	health_job "github.com/cloudtrust/elasticsearch-bridge/pkg/job"
 	"github.com/cloudtrust/go-jobs"
 	"github.com/cloudtrust/go-jobs/job"
 	job_lock "github.com/cloudtrust/go-jobs/lock"
@@ -57,10 +57,12 @@ var (
 )
 
 const (
-	influxKey = "influx"
-	jaegerKey = "jaeger"
-	redisKey  = "redis"
-	sentryKey = "sentry"
+	influxKey        = "influx"
+	jaegerKey        = "jaeger"
+	redisKey         = "redis"
+	sentryKey        = "sentry"
+	flakiKey         = "flaki"
+	elasticsearchKey = "elasticsearch"
 )
 
 func main() {
@@ -80,6 +82,13 @@ func main() {
 
 		// Flaki
 		flakiAddr = c.GetString("flaki-host-port")
+
+		// Elasticsearch
+		elasticsearchConfig = elasticsearch_bridge.Config{
+			Addr: fmt.Sprintf("http://%s", c.GetString("elasticsearch-host-port")),
+		}
+		elasticsearchIndexCleanInterval = c.GetDuration("elasticsearch-index-clean-interval")
+		elasticsearchIndexExpiration    = c.GetDuration("elasticsearch-index-expiration")
 
 		// Enabled units
 		cockroachEnabled  = c.GetBool("cockroach")
@@ -137,10 +146,12 @@ func main() {
 
 		// Jobs
 		healthChecksValidity = map[string]time.Duration{
-			influxKey: c.GetDuration("job-influx-health-validity"),
-			jaegerKey: c.GetDuration("job-jaeger-health-validity"),
-			redisKey:  c.GetDuration("job-redis-health-validity"),
-			sentryKey: c.GetDuration("job-sentry-health-validity"),
+			influxKey:        c.GetDuration("job-influx-health-validity"),
+			jaegerKey:        c.GetDuration("job-jaeger-health-validity"),
+			redisKey:         c.GetDuration("job-redis-health-validity"),
+			sentryKey:        c.GetDuration("job-sentry-health-validity"),
+			flakiKey:         c.GetDuration("job-flaki-health-validity"),
+			elasticsearchKey: c.GetDuration("job-elasticsearch-health-validity"),
 		}
 	)
 
@@ -290,6 +301,19 @@ func main() {
 		}
 	}
 
+	// Elasticsearch Client
+	var elasticsearchClient *elasticsearch_bridge.Client
+	{
+		var err error
+		var logger = log.With(logger, "unit", "elasticsearch")
+
+		elasticsearchClient, err = elasticsearch_bridge.New(elasticsearchConfig)
+		if err != nil {
+			logger.Log("msg", "could not create elasticsearch client", "error", err)
+			return
+		}
+	}
+
 	// Cockroach DB.
 	type Cockroach interface {
 		Exec(query string, args ...interface{}) (sql.Result, error)
@@ -341,9 +365,19 @@ func main() {
 		sentryHM = common.NewSentryModule(sentryClient, http.DefaultClient, sentryEnabled)
 		sentryHM = common.MakeSentryModuleLoggingMW(log.With(healthLogger, "mw", "module"))(sentryHM)
 	}
+	var flakiHM health.FlakiHealthChecker
+	{
+		flakiHM = common.NewFlakiModule(elasticsearch_bridge.NewFlakiLightClient(flakiClient))
+		flakiHM = common.MakeFlakiModuleLoggingMW(log.With(healthLogger, "mw", "module"))(flakiHM)
+	}
+	var elasticsearchHM health.ElasticsearchHealthChecker
+	{
+		elasticsearchHM = health.NewElasticsearchModule(elasticsearchClient)
+		elasticsearchHM = health.MakeElasticsearchModuleLoggingMW(log.With(healthLogger, "mw", "module"))(elasticsearchHM)
+	}
 	var healthComponent health.HealthChecker
 	{
-		healthComponent = health.NewComponent(influxHM, jaegerHM, redisHM, sentryHM, cockroachModule, healthChecksValidity)
+		healthComponent = health.NewComponent(influxHM, jaegerHM, redisHM, sentryHM, flakiHM, elasticsearchHM, cockroachModule, healthChecksValidity)
 		healthComponent = health.MakeComponentLoggingMW(log.With(healthLogger, "mw", "component"))(healthComponent)
 	}
 
@@ -395,6 +429,30 @@ func main() {
 		sentryReadHealthEndpoint = health.MakeEndpointLoggingMW(log.With(healthLogger, "mw", "endpoint", "unit", "ReadSentryHealthCheck"))(sentryReadHealthEndpoint)
 		sentryReadHealthEndpoint = health.MakeEndpointCorrelationIDMW(flakiClient, tracer)(sentryReadHealthEndpoint)
 	}
+	var flakiExecHealthEndpoint endpoint.Endpoint
+	{
+		flakiExecHealthEndpoint = health.MakeExecFlakiHealthCheckEndpoint(healthComponent)
+		flakiExecHealthEndpoint = health.MakeEndpointLoggingMW(log.With(healthLogger, "mw", "endpoint", "unit", "ExecFlakiHealthCheck"))(flakiExecHealthEndpoint)
+		flakiExecHealthEndpoint = health.MakeEndpointCorrelationIDMW(flakiClient, tracer)(flakiExecHealthEndpoint)
+	}
+	var flakiReadHealthEndpoint endpoint.Endpoint
+	{
+		flakiReadHealthEndpoint = health.MakeReadFlakiHealthCheckEndpoint(healthComponent)
+		flakiReadHealthEndpoint = health.MakeEndpointLoggingMW(log.With(healthLogger, "mw", "endpoint", "unit", "ReadFlakiHealthCheck"))(flakiReadHealthEndpoint)
+		flakiReadHealthEndpoint = health.MakeEndpointCorrelationIDMW(flakiClient, tracer)(flakiReadHealthEndpoint)
+	}
+	var elasticsearchExecHealthEndpoint endpoint.Endpoint
+	{
+		elasticsearchExecHealthEndpoint = health.MakeExecElasticsearchHealthCheckEndpoint(healthComponent)
+		elasticsearchExecHealthEndpoint = health.MakeEndpointLoggingMW(log.With(healthLogger, "mw", "endpoint", "unit", "ExecElasticsearchHealthCheck"))(elasticsearchExecHealthEndpoint)
+		elasticsearchExecHealthEndpoint = health.MakeEndpointCorrelationIDMW(flakiClient, tracer)(elasticsearchExecHealthEndpoint)
+	}
+	var elasticsearchReadHealthEndpoint endpoint.Endpoint
+	{
+		elasticsearchReadHealthEndpoint = health.MakeReadElasticsearchHealthCheckEndpoint(healthComponent)
+		elasticsearchReadHealthEndpoint = health.MakeEndpointLoggingMW(log.With(healthLogger, "mw", "endpoint", "unit", "ReadElasticsearchHealthCheck"))(elasticsearchReadHealthEndpoint)
+		elasticsearchReadHealthEndpoint = health.MakeEndpointCorrelationIDMW(flakiClient, tracer)(elasticsearchReadHealthEndpoint)
+	}
 	var allHealthEndpoint endpoint.Endpoint
 	{
 		allHealthEndpoint = health.MakeAllHealthChecksEndpoint(healthComponent)
@@ -403,21 +461,24 @@ func main() {
 	}
 
 	var healthEndpoints = health.Endpoints{
-		InfluxExecHealthCheck: influxExecHealthEndpoint,
-		InfluxReadHealthCheck: influxReadHealthEndpoint,
-		JaegerExecHealthCheck: jaegerExecHealthEndpoint,
-		JaegerReadHealthCheck: jaegerReadHealthEndpoint,
-		RedisExecHealthCheck:  redisExecHealthEndpoint,
-		RedisReadHealthCheck:  redisReadHealthEndpoint,
-		SentryExecHealthCheck: sentryExecHealthEndpoint,
-		SentryReadHealthCheck: sentryReadHealthEndpoint,
-		AllHealthChecks:       allHealthEndpoint,
+		InfluxExecHealthCheck:        influxExecHealthEndpoint,
+		InfluxReadHealthCheck:        influxReadHealthEndpoint,
+		JaegerExecHealthCheck:        jaegerExecHealthEndpoint,
+		JaegerReadHealthCheck:        jaegerReadHealthEndpoint,
+		RedisExecHealthCheck:         redisExecHealthEndpoint,
+		RedisReadHealthCheck:         redisReadHealthEndpoint,
+		SentryExecHealthCheck:        sentryExecHealthEndpoint,
+		SentryReadHealthCheck:        sentryReadHealthEndpoint,
+		FlakiExecHealthCheck:         flakiExecHealthEndpoint,
+		FlakiReadHealthCheck:         flakiReadHealthEndpoint,
+		ElasticsearchExecHealthCheck: elasticsearchExecHealthEndpoint,
+		ElasticsearchReadHealthCheck: elasticsearchReadHealthEndpoint,
+		AllHealthChecks:              allHealthEndpoint,
 	}
 
- 
-	// Jobs
+	// Local Jobs
 	{
-		var ctrl = controller.NewController(ComponentName, ComponentID, &idGenerator{flakiClient}, &job_lock.NoopLocker{}, controller.EnableStatusStorage(job_status.New(cJobsDB)))
+		var localCtrl = controller.NewController(ComponentName, ComponentID, &idGenerator{flakiClient}, &job_lock.NoopLocker{}, controller.EnableStatusStorage(job_status.New(cJobsDB)))
 
 		var influxJob *job.Job
 		{
@@ -427,8 +488,8 @@ func main() {
 				logger.Log("msg", "could not create influx health job", "error", err)
 				return
 			}
-			ctrl.Register(influxJob)
-			ctrl.Schedule("@minutely", influxJob.Name())
+			localCtrl.Register(influxJob)
+			localCtrl.Schedule("@minutely", influxJob.Name())
 		}
 
 		var jaegerJob *job.Job
@@ -439,8 +500,8 @@ func main() {
 				logger.Log("msg", "could not create jaeger health job", "error", err)
 				return
 			}
-			ctrl.Register(jaegerJob)
-			ctrl.Schedule("@minutely", jaegerJob.Name())
+			localCtrl.Register(jaegerJob)
+			localCtrl.Schedule("@minutely", jaegerJob.Name())
 		}
 
 		var redisJob *job.Job
@@ -451,8 +512,8 @@ func main() {
 				logger.Log("msg", "could not create redis health job", "error", err)
 				return
 			}
-			ctrl.Register(redisJob)
-			ctrl.Schedule("@minutely", redisJob.Name())
+			localCtrl.Register(redisJob)
+			localCtrl.Schedule("@minutely", redisJob.Name())
 		}
 
 		var sentryJob *job.Job
@@ -463,23 +524,67 @@ func main() {
 				logger.Log("msg", "could not create sentry health job", "error", err)
 				return
 			}
-			ctrl.Register(sentryJob)
-			ctrl.Schedule("@minutely", sentryJob.Name())
+			localCtrl.Register(sentryJob)
+			localCtrl.Schedule("@minutely", sentryJob.Name())
 		}
 
-		var cleanJob *job.Job
+		var flakiJob *job.Job
 		{
 			var err error
-			cleanJob, err = health_job.MakeCleanCockroachJob(cockroachModule, log.With(logger, "job", "clean health checks"))
+			flakiJob, err = health_job.MakeFlakiJob(flakiHM, healthChecksValidity[flakiKey], cockroachModule)
 			if err != nil {
-				logger.Log("msg", "could not create clean job", "error", err)
+				logger.Log("msg", "could not create flaki health job", "error", err)
 				return
 			}
-			ctrl.Register(cleanJob)
-			ctrl.Schedule(fmt.Sprintf("@every %s", cockroachCleanInterval), cleanJob.Name())
+			localCtrl.Register(flakiJob)
+			localCtrl.Schedule("@minutely", flakiJob.Name())
+		}
+
+		var elasticsearchJob *job.Job
+		{
+			var err error
+			elasticsearchJob, err = health_job.MakeElasticsearchJob(elasticsearchHM, healthChecksValidity[elasticsearchKey], cockroachModule)
+			if err != nil {
+				logger.Log("msg", "could not create elasticsearch health job", "error", err)
+				return
+			}
+			localCtrl.Register(elasticsearchJob)
+			localCtrl.Schedule("@minutely", elasticsearchJob.Name())
+		}
+
+		var cleanHealthChecksJob *job.Job
+		{
+			var err error
+			cleanHealthChecksJob, err = health_job.MakeCleanCockroachJob(cockroachModule, log.With(logger, "job", "clean health checks"))
+			if err != nil {
+				logger.Log("msg", "could not create clean health checks job", "error", err)
+				return
+			}
+			localCtrl.Register(cleanHealthChecksJob)
+			localCtrl.Schedule(fmt.Sprintf("@every %s", cockroachCleanInterval), cleanHealthChecksJob.Name())
 
 		}
-		ctrl.Start()
+
+		localCtrl.Start()
+	}
+
+	// Distributed Jobs
+	{
+		var distributedCtrl = controller.NewController(ComponentName, ComponentID, &idGenerator{flakiClient}, job_lock.New(cJobsDB), controller.EnableStatusStorage(job_status.New(cJobsDB)))
+
+		var cleanElasticIndexesJob *job.Job
+		{
+			var err error
+			cleanElasticIndexesJob, err = health_job.MakeElasticsearchCleanIndexJob(elasticsearchClient, elasticsearchIndexExpiration)
+			if err != nil {
+				logger.Log("msg", "could not create clean elastic indexes job", "error", err)
+				return
+			}
+			distributedCtrl.Register(cleanElasticIndexesJob)
+			distributedCtrl.Schedule(fmt.Sprintf("@every %s", elasticsearchIndexCleanInterval), cleanElasticIndexesJob.Name())
+		}
+
+		distributedCtrl.Start()
 	}
 
 	// HTTP server.
@@ -509,6 +614,12 @@ func main() {
 
 		healthSubroute.Handle("/sentry", health.MakeHealthCheckHandler(healthEndpoints.SentryReadHealthCheck)).Methods("GET")
 		healthSubroute.Handle("/sentry", health.MakeHealthCheckHandler(healthEndpoints.SentryExecHealthCheck)).Methods("POST")
+
+		healthSubroute.Handle("/flaki", health.MakeHealthCheckHandler(healthEndpoints.FlakiReadHealthCheck)).Methods("GET")
+		healthSubroute.Handle("/flaki", health.MakeHealthCheckHandler(healthEndpoints.FlakiExecHealthCheck)).Methods("POST")
+
+		healthSubroute.Handle("/elasticsearch", health.MakeHealthCheckHandler(healthEndpoints.ElasticsearchReadHealthCheck)).Methods("GET")
+		healthSubroute.Handle("/elasticsearch", health.MakeHealthCheckHandler(healthEndpoints.ElasticsearchExecHealthCheck)).Methods("POST")
 
 		// Debug.
 		if pprofRouteEnabled {
@@ -559,7 +670,7 @@ func (g *idGenerator) NextID() string {
 		rand.Seed(time.Now().UnixNano())
 		return "degraded-" + strconv.FormatUint(rand.Uint64(), 10)
 	}
-		 
+
 	return string(reply.Id())
 }
 
@@ -603,6 +714,11 @@ func config(logger log.Logger) *viper.Viper {
 	v.SetDefault("config-file", "./configs/elasticsearch_bridge.yml")
 	v.SetDefault("component-http-host-port", "0.0.0.0:8888")
 	v.SetDefault("component-grpc-host-port", "0.0.0.0:5555")
+
+	// ElasticSearch
+	v.SetDefault("elasticsearch-host-port", "")
+	v.SetDefault("elasticsearch-index-clean-interval", "24h")
+	v.SetDefault("elasticsearch-index-expiration", "24h")
 
 	// Flaki
 	v.SetDefault("flaki-host-port", "")

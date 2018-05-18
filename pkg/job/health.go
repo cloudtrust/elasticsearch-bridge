@@ -2,10 +2,11 @@ package job
 
 import (
 	"context"
-	"time"
 	"encoding/json"
+	"time"
 
 	common "github.com/cloudtrust/common-healthcheck"
+	health "github.com/cloudtrust/elasticsearch-bridge/pkg/health"
 	"github.com/cloudtrust/go-jobs/job"
 	"github.com/go-kit/kit/log"
 )
@@ -42,6 +43,16 @@ type SentryHealthChecker interface {
 	HealthChecks(context.Context) []common.SentryReport
 }
 
+// FlakiHealthChecker is the interface of the flaki health check module.
+type FlakiHealthChecker interface {
+	HealthChecks(context.Context) []common.FlakiReport
+}
+
+// ElasticsearchHealthChecker is the interface of the elasticsearch health check module.
+type ElasticsearchHealthChecker interface {
+	HealthChecks(context.Context) []health.ElasticsearchReport
+}
+
 // MakeInfluxJob creates the job that periodically exectutes the health checks and save the result in DB.
 func MakeInfluxJob(influx InfluxHealthChecker, healthCheckValidity time.Duration, cockroach Cockroach) (*job.Job, error) {
 	var step1 = func(ctx context.Context, r interface{}) (interface{}, error) {
@@ -50,7 +61,7 @@ func MakeInfluxJob(influx InfluxHealthChecker, healthCheckValidity time.Duration
 
 	var step2 = func(_ context.Context, r interface{}) (interface{}, error) {
 		var jsonReports, _ = json.Marshal(r)
-	
+
 		var err = cockroach.Update("influx", healthCheckValidity, jsonReports)
 		return nil, err
 	}
@@ -64,7 +75,7 @@ func MakeJaegerJob(jaeger JaegerHealthChecker, healthCheckValidity time.Duration
 	}
 	var step2 = func(_ context.Context, r interface{}) (interface{}, error) {
 		var jsonReports, _ = json.Marshal(r)
-	
+
 		var err = cockroach.Update("jaeger", healthCheckValidity, jsonReports)
 		return nil, err
 	}
@@ -78,7 +89,7 @@ func MakeRedisJob(redis RedisHealthChecker, healthCheckValidity time.Duration, c
 	}
 	var step2 = func(_ context.Context, r interface{}) (interface{}, error) {
 		var jsonReports, _ = json.Marshal(r)
-	
+
 		var err = cockroach.Update("redis", healthCheckValidity, jsonReports)
 		return nil, err
 	}
@@ -92,11 +103,39 @@ func MakeSentryJob(sentry SentryHealthChecker, healthCheckValidity time.Duration
 	}
 	var step2 = func(_ context.Context, r interface{}) (interface{}, error) {
 		var jsonReports, _ = json.Marshal(r)
-	
+
 		var err = cockroach.Update("sentry", healthCheckValidity, jsonReports)
 		return nil, err
 	}
 	return job.NewJob("sentry", job.Steps(step1, step2))
+}
+
+// MakeFlakiJob creates the job that periodically exectutes the health checks and save the result in DB.
+func MakeFlakiJob(flaki FlakiHealthChecker, healthCheckValidity time.Duration, cockroach Cockroach) (*job.Job, error) {
+	var step1 = func(ctx context.Context, r interface{}) (interface{}, error) {
+		return flaki.HealthChecks(ctx), nil
+	}
+	var step2 = func(_ context.Context, r interface{}) (interface{}, error) {
+		var jsonReports, _ = json.Marshal(r)
+
+		var err = cockroach.Update("flaki", healthCheckValidity, jsonReports)
+		return nil, err
+	}
+	return job.NewJob("flaki", job.Steps(step1, step2))
+}
+
+// MakeElasticsearchJob creates the job that periodically exectutes the health checks and save the result in DB.
+func MakeElasticsearchJob(elasticsearch ElasticsearchHealthChecker, healthCheckValidity time.Duration, cockroach Cockroach) (*job.Job, error) {
+	var step1 = func(ctx context.Context, r interface{}) (interface{}, error) {
+		return elasticsearch.HealthChecks(ctx), nil
+	}
+	var step2 = func(_ context.Context, r interface{}) (interface{}, error) {
+		var jsonReports, _ = json.Marshal(r)
+
+		var err = cockroach.Update("elasticsearch", healthCheckValidity, jsonReports)
+		return nil, err
+	}
+	return job.NewJob("elasticsearch", job.Steps(step1, step2))
 }
 
 // MakeCleanCockroachJob creates the job that periodically exectutes the health checks and save the result in DB.
