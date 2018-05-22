@@ -713,7 +713,6 @@ func config(logger log.Logger) *viper.Viper {
 	// Component default.
 	v.SetDefault("config-file", "./configs/elasticsearch_bridge.yml")
 	v.SetDefault("component-http-host-port", "0.0.0.0:8888")
-	v.SetDefault("component-grpc-host-port", "0.0.0.0:5555")
 
 	// ElasticSearch
 	v.SetDefault("elasticsearch-host-port", "")
